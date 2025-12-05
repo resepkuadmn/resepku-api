@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+// Import Cloudinary
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 class AboutController extends Controller
 {
@@ -33,13 +35,13 @@ class AboutController extends Controller
         ]);
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
-        $imageName = time() . '.' . $request->gambar->extension();
-        $request->gambar->move(public_path('gambar'), $imageName);
+        // Upload ke Cloudinary
+        $uploadedFileUrl = Cloudinary::upload($request->file('gambar')->getRealPath())->getSecurePath();
 
         $about = About::create([
             'judul' => $request->judul,
             'deskripsi' => $request->deskripsi,
-            'gambar' => $imageName,
+            'gambar' => $uploadedFileUrl,
             'layout' => $request->layout // Ambil dari request
         ]);
 
@@ -66,14 +68,12 @@ class AboutController extends Controller
         if (!$about) return response()->json(['message' => 'Not Found'], 404);
 
         $data = $request->except(['gambar']);
+        
         if ($request->hasFile('gambar')) {
-            if ($about->gambar && file_exists(public_path('gambar/' . $about->gambar))) {
-                unlink(public_path('gambar/' . $about->gambar));
-            }
-            $imageName = time() . '.' . $request->file('gambar')->extension();
-            $request->file('gambar')->move(public_path('gambar'), $imageName);
-            $data['gambar'] = $imageName;
+            $uploadedFileUrl = Cloudinary::upload($request->file('gambar')->getRealPath())->getSecurePath();
+            $data['gambar'] = $uploadedFileUrl;
         }
+        
         $about->update($data);
         return response()->json(['message' => 'Updated', 'data' => $about]);
     }
@@ -84,9 +84,6 @@ class AboutController extends Controller
 
         $aboutJudul = $about->judul; // Simpan judul sebelum dihapus
 
-        if ($about->gambar && file_exists(public_path('gambar/' . $about->gambar))) {
-            unlink(public_path('gambar/' . $about->gambar));
-        }
         $about->delete();
 
         // Notify users that about was deleted

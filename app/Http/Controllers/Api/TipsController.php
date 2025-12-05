@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
+// Import Cloudinary
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 class TipsController extends Controller
 {
@@ -32,14 +34,14 @@ class TipsController extends Controller
         ]);
         if ($validator->fails()) return response()->json(['errors' => $validator->errors()], 422);
 
-        $imageName = time() . '.' . $request->gambar->extension();
-        $request->gambar->move(public_path('gambar'), $imageName);
+        // Upload Cloudinary
+        $uploadedFileUrl = Cloudinary::upload($request->file('gambar')->getRealPath())->getSecurePath();
 
         $tips = Tips::create([
             'artikel_id_string' => Str::slug($request->judul) . '-' . uniqid(),
             'judul' => $request->judul,
             'konten' => $request->konten,
-            'gambar' => $imageName
+            'gambar' => $uploadedFileUrl
         ]);
 
         // Notify users
@@ -65,14 +67,12 @@ class TipsController extends Controller
         if (!$tips) return response()->json(['message' => 'Not Found'], 404);
 
         $data = $request->except(['gambar']);
+        
         if ($request->hasFile('gambar')) {
-            if ($tips->gambar && file_exists(public_path('gambar/' . $tips->gambar))) {
-                unlink(public_path('gambar/' . $tips->gambar));
-            }
-            $imageName = time() . '.' . $request->file('gambar')->extension();
-            $request->file('gambar')->move(public_path('gambar'), $imageName);
-            $data['gambar'] = $imageName;
+            $uploadedFileUrl = Cloudinary::upload($request->file('gambar')->getRealPath())->getSecurePath();
+            $data['gambar'] = $uploadedFileUrl;
         }
+        
         $tips->update($data);
         return response()->json(['message' => 'Updated', 'data' => $tips]);
     }
@@ -83,9 +83,7 @@ class TipsController extends Controller
 
         $tipsJudul = $tips->judul; // Simpan judul sebelum dihapus
 
-        if ($tips->gambar && file_exists(public_path('gambar/' . $tips->gambar))) {
-            unlink(public_path('gambar/' . $tips->gambar));
-        }
+        // Hapus data (File di Cloudinary biarkan atau hapus manual via dashboard jika mau)
         $tips->delete();
 
         // Notify users that tips was deleted

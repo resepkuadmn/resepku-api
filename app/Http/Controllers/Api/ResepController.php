@@ -11,9 +11,10 @@ use App\Mail\DeleteItemNotification;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Validator;
+// Import Facade Cloudinary
+use CloudinaryLabs\CloudinaryLaravel\Facades\Cloudinary;
 
 class ResepController extends Controller
 {
@@ -53,15 +54,11 @@ class ResepController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        // Upload Gambar
-        $imageName = null;
+        // --- UPLOAD KE CLOUDINARY ---
+        $uploadedFileUrl = null;
         if ($request->hasFile('gambar')) {
-            $image = $request->file('gambar');
-            // Format nama: uniqid-slugjudul.jpg
-            $imageName = uniqid() . '-' . Str::slug($request->judul) . '.' . $image->getClientOriginalExtension();
-            
-            // Simpan ke folder 'public/gambar' agar bisa diakses React
-            $image->move(public_path('gambar'), $imageName);
+            // Upload dan ambil URL HTTPS aman
+            $uploadedFileUrl = Cloudinary::upload($request->file('gambar')->getRealPath())->getSecurePath();
         }
 
         // Buat ID String Unik
@@ -75,7 +72,7 @@ class ResepController extends Controller
             'porsi' => $request->porsi,
             'bahan' => $request->bahan, // React akan mengirim string HTML (<li>..)
             'cara_membuat' => $request->cara_membuat,
-            'gambar' => $imageName
+            'gambar' => $uploadedFileUrl // Simpan URL Cloudinary
         ]);
 
         // Notify all regular users (role = 'user') via database and email
@@ -124,17 +121,9 @@ class ResepController extends Controller
 
         // Cek jika ada gambar baru
         if ($request->hasFile('gambar')) {
-            // Hapus gambar lama jika ada
-            if ($resep->gambar && file_exists(public_path('gambar/' . $resep->gambar))) {
-                unlink(public_path('gambar/' . $resep->gambar));
-            }
-
-            // Upload gambar baru
-            $image = $request->file('gambar');
-            $imageName = uniqid() . '-' . Str::slug($request->judul) . '.' . $image->getClientOriginalExtension();
-            $image->move(public_path('gambar'), $imageName);
-            
-            $data['gambar'] = $imageName;
+            // Upload gambar baru ke Cloudinary
+            $uploadedFileUrl = Cloudinary::upload($request->file('gambar')->getRealPath())->getSecurePath();
+            $data['gambar'] = $uploadedFileUrl;
         }
 
         $resep->update($data);
@@ -150,10 +139,8 @@ class ResepController extends Controller
 
         $resepJudul = $resep->judul; // Simpan judul sebelum dihapus
 
-        // Hapus file gambar fisik
-        if ($resep->gambar && file_exists(public_path('gambar/' . $resep->gambar))) {
-            unlink(public_path('gambar/' . $resep->gambar));
-        }
+        // Tidak perlu unlink manual karena file ada di Cloudinary
+        // (Opsional: Bisa tambah logika hapus di Cloudinary jika menyimpan public_id)
 
         $resep->delete();
 

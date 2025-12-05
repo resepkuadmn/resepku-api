@@ -14,7 +14,7 @@ return [
     */
 
     'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout', 'gambar/*'],
-    'allowed_methods' => ['*'],
+    'allowed_origins' => ['https://resepku-client.vercel.app/'],
 
     // Mengizinkan semua origin (domain).
     // Jika ingin lebih ketat, ganti '*' dengan array URL frontend Vercel nanti.
